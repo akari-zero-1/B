@@ -11,14 +11,36 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config import settings
-from src.routes import chat_router, products_router, link_parser_router, alerts_router
+from src.routes import chat_router, products_router, link_parser_router, alerts_router, crawler_router
 from database.connection import init_db, close_db
+from services.batch_crawler import batch_crawler_service
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Khởi tạo CSDL SQLite và các bảng tự động khi khởi động
     await init_db()
+
+    # Phương án 2: Tự động chạy ngầm làm ấm CSDL (Startup Warm-up) nếu kho rỗng hoặc dữ liệu > 12h
+    async def _startup_warmup():
+        try:
+            # Chờ 1 giây để server FastAPI sẵn sàng lắng nghe request
+            await asyncio.sleep(1.0)
+            if await batch_crawler_service.should_warmup():
+                print("⚡ [Startup Warm-up] Phat hien CSDL can lam am, khoi dong thu thap tu dong cac mat hang HOT...")
+                await batch_crawler_service.run_batch_crawl(limit_per_query=3, force_refresh=True)
+                print("✅ [Startup Warm-up] Da hoan tat lam am CSDL voi du lieu thuc!")
+            else:
+                print("✨ [Startup Warm-up] Du lieu trong CSDL van con moi, bo qua thu thap nen.")
+        except Exception as e:
+            print(f"⚠️ [Startup Warm-up] Loi tien trinh lam am CSDL: {e}")
+
+    warmup_task = asyncio.create_task(_startup_warmup())
+
     yield
+
+    # Huy task nen neu con dang chay khi tat server
+    if not warmup_task.done():
+        warmup_task.cancel()
     # Giải phóng kết nối khi tắt server
     await close_db()
 
@@ -46,6 +68,7 @@ app.include_router(chat_router, prefix="/api/v1")
 app.include_router(products_router, prefix="/api/v1")
 app.include_router(link_parser_router, prefix="/api/v1")
 app.include_router(alerts_router, prefix="/api/v1")
+app.include_router(crawler_router, prefix="/api/v1")
 
 @app.get("/", tags=["Root"])
 async def root():
