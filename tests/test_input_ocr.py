@@ -3,15 +3,12 @@ import json
 import sys
 import os
 
-# Thiết lập UTF-8 để hiển thị tiếng Việt chuẩn trên Windows
-if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
-
 # Đảm bảo đường dẫn import
 sys.path.append(os.path.abspath('.'))
 
 from core.state import AgentState
 from core.agents.orchestrator import OrchestratorAgent
+
 
 # Danh sách các câu hỏi test mẫu đa dạng các ngành hàng
 SAMPLE_QUERIES = [

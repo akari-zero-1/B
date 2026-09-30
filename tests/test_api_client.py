@@ -2,15 +2,13 @@ import sys
 import io
 import json
 
-if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-
 sys.path.insert(0, ".")
 
 from fastapi.testclient import TestClient
 from src.main import app
 
 client = TestClient(app)
+
 
 def test_single_platforms():
     print("=" * 65)

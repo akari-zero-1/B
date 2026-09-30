@@ -9,8 +9,10 @@ from bs4 import BeautifulSoup
 from typing import List, Dict, Any, Optional
 from .base import BaseTool
 from ..state import UniversalSearchCriteria
+from database.repositories import product_repository
 
 logger = logging.getLogger("ecom_search")
+
 
 class EcomSearchTool(BaseTool):
     name = "ecom_search"
@@ -501,10 +503,12 @@ class EcomSearchTool(BaseTool):
         category: str = "all",
         criteria: Optional[UniversalSearchCriteria] = None,
         platform: str = "all",
-        limit: int = 6
+        limit: int = 6,
+        force_refresh: bool = False
     ) -> List[Dict[str, Any]]:
         """
-        Thực hiện tìm kiếm sản phẩm thực tế từ các sàn & chuỗi bán lẻ: Tiki, Lazada, Shopee, Thế Giới Di Động, Điện Máy Xanh.
+        Thực hiện tìm kiếm sản phẩm thực tế từ các chuỗi bán lẻ: Tiki, Thế Giới Di Động, Điện Máy Xanh.
+        Áp dụng cơ chế Cache-First (kiểm tra SQLite trước, chỉ cào mạng khi chưa có hoặc hết hạn).
         Không sử dụng dữ liệu giả lập (mock data).
         """
         search_keyword = criteria.cleaned_query if (criteria and criteria.cleaned_query) else query
@@ -512,6 +516,43 @@ class EcomSearchTool(BaseTool):
             return []
 
         # Xác định sàn mục tiêu
+        effective_platform = platform.lower().strip() if (platform and platform != "all") else "all"
+        if effective_platform == "all" and criteria and criteria.target_platforms:
+            effective_platform = criteria.target_platforms[0].lower().strip()
+
+        # =====================================================================
+        # 1. KIỂM TRA BỘ NHỚ ĐỆM (CACHE-FIRST) TRƯỚC KHI CÀO MẠNG
+        # =====================================================================
+        if not force_refresh:
+            try:
+                cached_products = await product_repository.get_cached_search(
+                    query=search_keyword,
+                    platform=effective_platform
+                )
+                if cached_products:
+                    # Áp dụng bộ lọc giá criteria nếu có
+                    filtered_cached = []
+                    for p in cached_products:
+                        curr_p = float(p.get("currentPrice", 0))
+                        if criteria:
+                            if criteria.max_price and curr_p > criteria.max_price:
+                                continue
+                            if criteria.min_price and curr_p < criteria.min_price:
+                                continue
+                        filtered_cached.append(p)
+                        if len(filtered_cached) >= limit:
+                            break
+                    if filtered_cached:
+                        logger.info(
+                            f"⚡ [Cache Hit] Trả về {len(filtered_cached)} sản phẩm từ SQLite cho '{search_keyword}' (platform={effective_platform}) trong <20ms"
+                        )
+                        return filtered_cached
+            except Exception as cache_err:
+                logger.warning(f"Lỗi kiểm tra cache SQLite: {cache_err}")
+
+        # =====================================================================
+        # 2. NẾU CHƯA CÓ TRONG CACHE -> CÀO MẠNG THỰC TẾ (CACHE MISS)
+        # =====================================================================
         if platform and platform != "all":
             target_platforms = [platform.lower()]
         else:
@@ -575,8 +616,24 @@ class EcomSearchTool(BaseTool):
 
         logger.info(
             f"🔍 Tìm kiếm thực tế cho '{search_keyword}': {len(tgdd_res)} TGDD, "
-            f"{len(dmx_res)} DMX, {len(tiki_res)} Tiki -> Trả về: {len(products)} sản phẩm (Lazada & Shopee đang tạm dừng)."
+            f"{len(dmx_res)} DMX, {len(tiki_res)} Tiki -> Trả về: {len(products)} sản phẩm."
         )
+
+        # =====================================================================
+        # 3. TỰ ĐỘNG LƯU VÀO CSDL VÀ CẬP NHẬT CACHE CHO LẦN SAU
+        # =====================================================================
+        if products:
+            try:
+                await product_repository.save_search_cache(
+                    query=search_keyword,
+                    platform=effective_platform,
+                    products=products,
+                    ttl_hours=2  # Ghi nhớ trong vòng 2 tiếng
+                )
+            except Exception as save_err:
+                logger.warning(f"Lỗi tự động lưu cache CSDL: {save_err}")
+
         return products
+
 
 

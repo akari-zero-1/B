@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import List, Literal, Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 from dotenv import load_dotenv
 
@@ -29,34 +29,35 @@ class Settings(BaseSettings):
     # =========================================================================
     LLM_PROVIDER: Literal["groq", "openrouter"] = Field(
         default="groq",
-        env="LLM_PROVIDER",
         description="Lựa chọn LLM Provider chính: 'groq' hoặc 'openrouter'"
     )
     
     # Cấu hình Groq API
-    GROQ_API_KEY: str = Field(default="", env="GROQ_API_KEY")
-    GROQ_MODEL: str = Field(default="openai/gpt-oss-20b", env="GROQ_MODEL")
+    GROQ_API_KEY: str = Field(default="")
+    GROQ_MODEL: str = Field(default="openai/gpt-oss-20b")
 
     # Cấu hình OpenRouter API
-    OPENROUTER_API_KEY: str = Field(default="", env="OPENROUTER_API_KEY")
-    OPENROUTER_MODEL: str = Field(default="deepseek/deepseek-chat", env="OPENROUTER_MODEL")
-    OPENROUTER_BASE_URL: str = Field(default="https://openrouter.ai/api/v1", env="OPENROUTER_BASE_URL")
+    OPENROUTER_API_KEY: str = Field(default="")
+    OPENROUTER_MODEL: str = Field(default="deepseek/deepseek-chat")
+    OPENROUTER_BASE_URL: str = Field(default="https://openrouter.ai/api/v1")
 
     # =========================================================================
     # LANGSMITH TRACING (3 Environment Variables)
     # =========================================================================
-    LANGCHAIN_TRACING_V2: str = Field(default="true", env="LANGCHAIN_TRACING_V2")
-    LANGCHAIN_API_KEY: str = Field(default="", env="LANGCHAIN_API_KEY")
-    LANGCHAIN_PROJECT: str = Field(default="shopai-agent", env="LANGCHAIN_PROJECT")
-    LANGCHAIN_ENDPOINT: str = Field(default="https://api.smith.langchain.com", env="LANGCHAIN_ENDPOINT")
+    LANGCHAIN_TRACING_V2: str = Field(default="true")
+    LANGCHAIN_API_KEY: str = Field(default="")
+    LANGCHAIN_PROJECT: str = Field(default="shopai-agent")
+    LANGCHAIN_ENDPOINT: str = Field(default="https://api.smith.langchain.com")
 
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./shopai.db"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
 
 # Khởi tạo singleton settings
 settings = Settings()
@@ -125,4 +126,4 @@ def get_chat_model(temperature: float = 0.7):
 
     logger.warning("Chưa có API key hợp lệ cho Groq hoặc OpenRouter.")
     return None
-    return None
+

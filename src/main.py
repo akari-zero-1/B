@@ -7,18 +7,30 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config import settings
 from src.routes import chat_router, products_router, link_parser_router, alerts_router
+from database.connection import init_db, close_db
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Khởi tạo CSDL SQLite và các bảng tự động khi khởi động
+    await init_db()
+    yield
+    # Giải phóng kết nối khi tắt server
+    await close_db()
 
 app = FastAPI(
     title=settings.APP_NAME,
     description="Hệ thống Backend Multi-Agent thông minh (Hỗ trợ Groq / OpenRouter & LangSmith Tracing)",
     version="1.0.0",
     docs_url="/docs",      # Swagger UI tại http://localhost:8000/docs
-    redoc_url="/redoc"    # Redoc UI tại http://localhost:8000/redoc
+    redoc_url="/redoc",    # Redoc UI tại http://localhost:8000/redoc
+    lifespan=lifespan
 )
+
 
 # Cấu hình CORS để Frontend G (React/Next.js tại port 3000) có thể gọi trực tiếp
 app.add_middleware(

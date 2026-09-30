@@ -1,21 +1,19 @@
 import sys
 import io
-
-if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-
-sys.path.insert(0, ".")
-
 import asyncio
 import json
-from fastapi.testclient import TestClient
-from src.main import app
-from core.tools.ecom_search import EcomSearchTool
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
+sys.path.insert(0, ".")
+
+from fastapi.testclient import TestClient
+from src.main import app
+from core.tools.ecom_search import EcomSearchTool
+
 client = TestClient(app)
+
 
 def test_direct_tools():
     print("\n--- 1. TEST DIRECT ECOM_SEARCH TOOL ---")

@@ -41,11 +41,14 @@ class ProductItemModel(BaseModel):
     reviewsCount: str = "100+ đánh giá"
     sku: str = ""
     image: str = ""
+    specs: Optional[str] = ""
     aiSummary: str = ""
     warranty: str = "Chính hãng 12 tháng"
     deliveryTag: Optional[str] = "Freeship"
     selected: bool = False
     externalUrl: str = ""
+    updatedAt: Optional[str] = None
+
 
 class MessageItem(BaseModel):
     id: str
